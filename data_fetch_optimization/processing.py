@@ -19,6 +19,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         max_attempts_per_request: int,
         backoff_manager: BackoffManager,
         operations: OperationModel[RequestArg, Response],
+        thread_sleep_seconds_if_no_work: float = 0.1,
     ):
         self.max_threads = max_threads
         self.max_attempts_per_request = max_attempts_per_request
@@ -28,6 +29,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         self.active_api_fetch_tasks = 0
         self.counter_lock = threading.Lock()
         self.operations = operations
+        self.thread_sleep_seconds_if_no_work = thread_sleep_seconds_if_no_work
 
     def _initialize_api_fetch_queue(self):
         for api_fetch_request_arg in self.operations.initial_operation():
@@ -79,9 +81,16 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                 write_task()
             else:
                 # If both queues are empty, check again after brief pause
-                time.sleep(0.1)
+                time.sleep(self.thread_sleep_seconds_if_no_work)
 
     def process(self):
         self._initialize_api_fetch_queue()
+        threads: t.List[threading.Thread] = []
         for _ in range(self.max_threads):
-            threading.Thread(target=self._worker).start()
+            thread = threading.Thread(target=self._worker)
+            thread.start()
+            threads.append(thread)
+
+        # Join all threads
+        for thread in threads:
+            thread.join()
