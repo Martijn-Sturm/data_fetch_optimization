@@ -4,7 +4,6 @@ from data_fetch_optimization.backoff import BackoffManager
 from data_fetch_optimization.operation import OperationModel, RequestArg, Response
 from data_fetch_optimization.log import MockLogger
 import time
-from functools import partial
 import typing as t
 import logging
 
@@ -50,8 +49,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             self.backoff_manager.increase_backoff()
             if request_attempt < self.max_attempts_per_request:
                 self.api_fetch_queue.put(
-                    partial(
-                        self._api_fetch_task,
+                    lambda: self._api_fetch_task(
                         request_argument,
                         request_attempt + 1,
                     )
