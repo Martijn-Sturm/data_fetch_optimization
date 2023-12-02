@@ -22,13 +22,13 @@ class OperationModel(t.Generic[RequestArg, Response]):
         It must return a boolean indicating if the response was successful."""
         ...
 
-    def write_upon_definitive_request_failure(
-        self, request_argument: RequestArg
+    def upon_definitive_request_failure(
+        self, request_argument: RequestArg, response: Response
     ) -> None:
         """[Optional] -> can be empty function
         This method is invoked when the API has failed to respond
         after max_attempts_per_request attempts.
-        It must write the request argument to disk."""
+        """
         ...
 
     def write_fetched_data(self, response: Response) -> None:
@@ -49,5 +49,5 @@ class DummyOperations(OperationModel[str, int]):
     def write_fetched_data(self, response: int) -> None:
         print(response)
 
-    def write_upon_definitive_request_failure(self, request_argument: str):
+    def upon_definitive_request_failure(self, request_argument: str, response: int):
         print(request_argument)

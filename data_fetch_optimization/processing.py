@@ -2,9 +2,11 @@ import threading
 from queue import Queue
 from data_fetch_optimization.backoff import BackoffManager
 from data_fetch_optimization.operation import OperationModel, RequestArg, Response
+from data_fetch_optimization.log import MockLogger
 import time
 from functools import partial
 import typing as t
+import logging
 
 
 class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
@@ -20,6 +22,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         backoff_manager: BackoffManager,
         operations: OperationModel[RequestArg, Response],
         thread_sleep_seconds_if_no_work: float = 0.1,
+        logger: logging.Logger = MockLogger(),  # type: ignore
     ):
         self.max_threads = max_threads
         self.max_attempts_per_request = max_attempts_per_request
@@ -30,6 +33,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         self.counter_lock = threading.Lock()
         self.operations = operations
         self.thread_sleep_seconds_if_no_work = thread_sleep_seconds_if_no_work
+        self.logger = logger
 
     def _initialize_api_fetch_queue(self):
         for api_fetch_request_arg in self.operations.initial_operation():
@@ -53,8 +57,20 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                     )
                 )
             else:
-                self.operations.write_upon_definitive_request_failure(request_argument)
+                self.logger.error(
+                    "Request failed for api fetch task with arg: %s and response: %s",
+                    request_argument,
+                    response,
+                )
+                self.operations.upon_definitive_request_failure(
+                    request_argument, response
+                )
         else:
+            self.logger.info(
+                "Request succeeded for arg: %s on attempt nr: %s",
+                request_argument,
+                request_attempt,
+            )
             self.backoff_manager.reset_backoff()
             self.write_queue.put(lambda: self.operations.write_fetched_data(response))
 
@@ -86,6 +102,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
     def process(self):
         self._initialize_api_fetch_queue()
         threads: t.List[threading.Thread] = []
+        self.logger.info("Going to initialize %s threads", self.max_threads)
         for _ in range(self.max_threads):
             thread = threading.Thread(target=self._worker)
             thread.start()
