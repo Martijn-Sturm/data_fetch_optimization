@@ -31,7 +31,9 @@ class OperationModel(t.Generic[RequestArg, Response]):
         """
         ...
 
-    def write_fetched_data(self, response: Response) -> None:
+    def write_fetched_data(
+        self, request_argument: RequestArg, response: Response
+    ) -> None:
         """This method processes the response, and writes data to disk."""
         ...
 

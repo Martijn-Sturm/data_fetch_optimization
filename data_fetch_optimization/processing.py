@@ -70,7 +70,9 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                 request_attempt,
             )
             self.backoff_manager.reset_backoff()
-            self.write_queue.put(lambda: self.operations.write_fetched_data(response))
+            self.write_queue.put(
+                lambda: self.operations.write_fetched_data(request_argument, response)
+            )
 
     def _worker(self):
         while (
