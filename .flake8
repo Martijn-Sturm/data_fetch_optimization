@@ -1,0 +1,16 @@
+[flake8]
+; extend-ignore = E203
+; Black's max line length:
+max-line-length = 88
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    .venv,
+ignore = 
+    # https://www.flake8rules.com/rules/W503.html
+    W503,
+    ; Many databricks namespaces not available locally
+    F821,
+max-complexity = 5
