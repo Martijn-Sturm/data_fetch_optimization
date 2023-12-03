@@ -46,6 +46,11 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             )
 
     def _api_fetch_task(self, request_argument: RequestArg, request_attempt: int):
+        wait = self.backoff_manager.should_back_off()
+        while wait:
+            time.sleep(self.backoff_manager.get_backoff_seconds())
+            wait = self.backoff_manager.should_back_off()
+
         response = self.operations.fetch_from_api(request_argument)
         if not self.operations.response_succeeded(response):
             self.backoff_manager.increase_backoff()
