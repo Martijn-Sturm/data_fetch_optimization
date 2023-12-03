@@ -36,6 +36,9 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
 
     def _initialize_api_fetch_queue(self):
         for api_fetch_request_arg in self.operations.initial_operation():
+            self.logger.debug(
+                "Adding request arg: %s, to api fetch task queue", api_fetch_request_arg
+            )
             self.api_fetch_queue.put(
                 lambda: self._api_fetch_task(
                     request_argument=api_fetch_request_arg,
