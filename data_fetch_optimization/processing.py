@@ -40,9 +40,8 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                 "Adding request arg: %s, to api fetch task queue", api_fetch_request_arg
             )
             self.api_fetch_queue.put(
-                lambda: self._api_fetch_task(
-                    request_argument=api_fetch_request_arg,
-                    request_attempt=1,
+                lambda arg=api_fetch_request_arg, attempt=1: self._api_fetch_task(
+                    arg, attempt
                 )
             )
 
@@ -52,9 +51,9 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             self.backoff_manager.increase_backoff()
             if request_attempt < self.max_attempts_per_request:
                 self.api_fetch_queue.put(
-                    lambda: self._api_fetch_task(
-                        request_argument,
-                        request_attempt + 1,
+                    lambda arg=request_argument, attempt=request_attempt + 1: self._api_fetch_task(  # noqa
+                        arg,
+                        attempt,
                     )
                 )
             else:
@@ -74,7 +73,9 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             )
             self.backoff_manager.reset_backoff()
             self.write_queue.put(
-                lambda: self.operations.write_fetched_data(request_argument, response)
+                lambda arg=request_argument, resp=response: self.operations.write_fetched_data(  # noqa
+                    arg, resp
+                )
             )
 
     def _worker(self):
