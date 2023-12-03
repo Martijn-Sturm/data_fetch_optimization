@@ -46,11 +46,14 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             )
 
     def _api_fetch_task(self, request_argument: RequestArg, request_attempt: int):
-        wait = self.backoff_manager.should_back_off()
+        wait = self.backoff_manager.get_wait_seconds()
         while wait:
-            time.sleep(self.backoff_manager.get_backoff_seconds())
-            wait = self.backoff_manager.should_back_off()
+            self.logger.debug("API in backoff, waiting %s seconds", wait)
+            time.sleep(wait)
+            wait = self.backoff_manager.get_wait_seconds()
+            self.logger.debug("After sleep in api fetch task, wait is %s", wait)
 
+        self.backoff_manager.making_api_call()
         response = self.operations.fetch_from_api(request_argument)
         if not self.operations.response_succeeded(response):
             self.backoff_manager.increase_backoff()
@@ -90,10 +93,11 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             or not self.write_queue.empty()
         ):
             if not self.api_fetch_queue.empty() and (
-                self.write_queue.empty() or self.backoff_manager.should_back_off()
+                self.write_queue.empty() or self.backoff_manager.get_wait_seconds()
             ):
                 # Prefer API fetch task unless the API is in backoff
                 # or the write queue is larger
+                self.logger.debug("adding api fetch task to thread")
                 api_fetch_task = self.api_fetch_queue.get()
                 with self.counter_lock:
                     self.active_api_fetch_tasks += 1
@@ -102,10 +106,12 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                     self.active_api_fetch_tasks -= 1
             elif not self.write_queue.empty():
                 # If there are tasks in the write queue, perform write to disk
+                self.logger.debug("adding write task to thread")
                 write_task = self.write_queue.get()
                 write_task()
             else:
                 # If both queues are empty, check again after brief pause
+                self.logger.debug("thread going to sleep")
                 time.sleep(self.thread_sleep_seconds_if_no_work)
 
     def process(self):
