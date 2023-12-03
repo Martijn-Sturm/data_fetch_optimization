@@ -58,6 +58,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         if not self.operations.response_succeeded(response):
             self.backoff_manager.increase_backoff()
             if request_attempt < self.max_attempts_per_request:
+                self.logger.debug("adding retry api fetch task to queue")
                 self.api_fetch_queue.put(
                     lambda arg=request_argument, attempt=request_attempt + 1: self._api_fetch_task(  # noqa
                         arg,
@@ -80,6 +81,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                 request_attempt,
             )
             self.backoff_manager.reset_backoff()
+            self.logger.debug("Adding write task to write queue")
             self.write_queue.put(
                 lambda arg=request_argument, resp=response: self.operations.write_fetched_data(  # noqa
                     arg, resp
@@ -92,12 +94,10 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             or self.active_api_fetch_tasks > 0
             or not self.write_queue.empty()
         ):
-            if not self.api_fetch_queue.empty() and (
-                self.write_queue.empty() or self.backoff_manager.get_wait_seconds()
-            ):
+            if not self.api_fetch_queue.empty() and self.write_queue.empty():
                 # Prefer API fetch task unless the API is in backoff
                 # or the write queue is larger
-                self.logger.debug("adding api fetch task to thread")
+                self.logger.debug("thread is picking up api fetch task")
                 api_fetch_task = self.api_fetch_queue.get()
                 with self.counter_lock:
                     self.active_api_fetch_tasks += 1
@@ -106,7 +106,7 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                     self.active_api_fetch_tasks -= 1
             elif not self.write_queue.empty():
                 # If there are tasks in the write queue, perform write to disk
-                self.logger.debug("adding write task to thread")
+                self.logger.debug("thread is picking up write task")
                 write_task = self.write_queue.get()
                 write_task()
             else:

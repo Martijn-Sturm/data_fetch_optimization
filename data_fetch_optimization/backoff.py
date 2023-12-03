@@ -31,7 +31,6 @@ class BackoffManager:
         with self.lock:
             self.logger.debug("Backoff reset")
             self.current_backoff = self.initial_backoff
-            self.backoff_release_time = time.time() + self.initial_backoff
 
     def get_wait_seconds(self):
         with self.lock:
