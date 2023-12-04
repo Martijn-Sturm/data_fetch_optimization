@@ -45,7 +45,41 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
                 )
             )
 
+    def _handle_failed_request(
+        self, request_argument: RequestArg, response: Response, request_attempt: int
+    ):
+        self.backoff_manager.increase_backoff()
+        if request_attempt < self.max_attempts_per_request:
+            self.logger.debug(
+                "adding retry api fetch task to queue with "
+                "request arg: %s and with attempt nr: %s",
+                request_argument,
+                request_attempt,
+            )
+            self.api_fetch_queue.put(
+                lambda arg=request_argument, attempt=request_attempt + 1: self._api_fetch_task(  # noqa
+                    arg,
+                    attempt,
+                )
+            )
+        else:
+            self.logger.error(
+                "Request failed for api fetch task with arg: %s and response: %s",
+                request_argument,
+                response,
+            )
+            self.operations.upon_definitive_request_failure(request_argument, response)
+
     def _api_fetch_task(self, request_argument: RequestArg, request_attempt: int):
+        if self.backoff_manager.has_exceeded_max_time_in_subsequent_backoff():
+            self.operations.upon_request_abortion(
+                request_argument,
+                "API longer in backoff than set max seconds: "
+                f"{self.backoff_manager.max_seconds_in_subsequent_backoff}, "
+                f"aborted at attempt nr: {request_attempt}",
+            )
+            return
+
         wait = self.backoff_manager.get_wait_seconds()
         while wait:
             self.logger.debug("API in backoff, waiting %s seconds", wait)
@@ -54,26 +88,14 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             self.logger.debug("After sleep in api fetch task, wait is %s", wait)
 
         self.backoff_manager.making_api_call()
+        self.logger.debug(
+            "Making API call for arg: %s and attempt nr: %s",
+            request_argument,
+            request_attempt,
+        )
         response = self.operations.fetch_from_api(request_argument)
         if not self.operations.response_succeeded(response):
-            self.backoff_manager.increase_backoff()
-            if request_attempt < self.max_attempts_per_request:
-                self.logger.debug("adding retry api fetch task to queue")
-                self.api_fetch_queue.put(
-                    lambda arg=request_argument, attempt=request_attempt + 1: self._api_fetch_task(  # noqa
-                        arg,
-                        attempt,
-                    )
-                )
-            else:
-                self.logger.error(
-                    "Request failed for api fetch task with arg: %s and response: %s",
-                    request_argument,
-                    response,
-                )
-                self.operations.upon_definitive_request_failure(
-                    request_argument, response
-                )
+            self._handle_failed_request(request_argument, response, request_attempt)
         else:
             self.logger.info(
                 "Request succeeded for arg: %s on attempt nr: %s",

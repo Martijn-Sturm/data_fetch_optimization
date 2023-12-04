@@ -31,6 +31,15 @@ class OperationModel(t.Generic[RequestArg, Response]):
         """
         ...
 
+    def upon_request_abortion(
+        self, request_argument: RequestArg, context: t.Optional[str]
+    ) -> None:
+        """[Optional] -> can be empty function
+        This method is invoked when the API client hasn't been responsive,
+        and still remaining API fetch tasks are aborted.
+        """
+        ...
+
     def write_fetched_data(
         self, request_argument: RequestArg, response: Response
     ) -> None:
