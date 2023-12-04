@@ -148,6 +148,9 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
             or self.active_api_fetch_tasks > 0
             or not self.write_queue.empty()
         ):
+            self.logger.info(
+                "remaining active api fetch tasks: %s", self.active_api_fetch_tasks
+            )
             if not self.api_fetch_queue.empty() and self.write_queue.empty():
                 # Prefer API fetch task unless the API is in backoff
                 # or the write queue is larger
