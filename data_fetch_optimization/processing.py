@@ -2,7 +2,6 @@ import threading
 from queue import Queue
 from data_fetch_optimization.backoff import BackoffManager
 from data_fetch_optimization.operation import OperationModel, RequestArg, Response
-from data_fetch_optimization.log import MockLogger
 import time
 import typing as t
 import logging
@@ -21,8 +20,8 @@ class FetchWriteCoordinator(t.Generic[RequestArg, Response]):
         max_attempts_per_request: int,
         backoff_manager: BackoffManager,
         operations: OperationModel[RequestArg, Response],
+        logger: logging.Logger,
         thread_sleep_seconds_if_no_work: float = 0.1,
-        logger: logging.Logger = MockLogger(),  # type: ignore
     ):
         self.max_threads = max_threads
         self.max_attempts_per_request = max_attempts_per_request
