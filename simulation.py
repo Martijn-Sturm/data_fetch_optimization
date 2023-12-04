@@ -43,7 +43,13 @@ operations = DemoOperations(
 )
 
 logger_backoff = logger.getChild("backoff_manager")
-backoff = BackoffManager(logger=logger_backoff)
+backoff = BackoffManager(
+    initial_delay_seconds=1,
+    max_delay_seconds=1 * 60,
+    backoff_factor=2,
+    max_seconds_in_subsequent_backoff=5 * 60,
+    logger=logger_backoff,
+)
 
 processor = FetchWriteCoordinator(
     max_threads=5,

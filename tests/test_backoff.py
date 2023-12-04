@@ -4,8 +4,8 @@ import time
 
 def test_backoff_manager_exceeded_max_seconds_in_subsequent_backoff():
     backoff_manager = BackoffManager(
-        initial_backoff=1,
-        max_backoff=5 * 60,
+        initial_delay_seconds=1,
+        max_delay_seconds=5 * 60,
         backoff_factor=2,
         max_seconds_in_subsequent_backoff=10,
     )
