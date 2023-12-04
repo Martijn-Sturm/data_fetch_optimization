@@ -51,3 +51,6 @@ class DemoOperations(OperationModel[int, bool]):
             response,
         )
         time.sleep(random.choice(self.write_delay_sequence))
+
+    def upon_request_abortion(self, request_argument: int, context: str | None) -> None:
+        self.logger.info("Aborting request: %s, context: %s", request_argument, context)
